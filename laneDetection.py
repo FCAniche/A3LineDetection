@@ -5,35 +5,35 @@ from moviepy.editor import VideoFileClip
 import math
 
 # Convert BGR images to RGB color space
-def BGR2RGB(img):
+def bgr_2_rgb(img):
     return cv.cvtColor(img, cv.COLOR_BGR2RGB)
 
-def RGB2BGR(img):
+def rgb_2_bgr(img):
     return cv.cvtColor(img, cv.COLOR_RGB2BGR)
 
 def mid_point(line):
     for x1,y1,x2,y2 in line:
-        midX = (x1 + x2) / 2
-        midY = (y1 + y2) / 2
-        return np.array([midX, midY])
+        mid_x = (x1 + x2) / 2
+        mid_y = (y1 + y2) / 2
+        return np.array([mid_x, mid_y])
     
-def y_intercept(x,y,m):
-    return y - (m*x)
+def y_intercept(x, y, m):
+    return y - (m * x)
 
-def find_x(y,m,b):
+def find_x(y, m, b):
     y = y - b
     return y / m
 
-def draw_lines(img, lines, color=[255, 0, 0], thickness=2):
-    l_mid_points = np.array([0,0])
-    l_slope = 0
-    l_count = 0
-    ly = img.shape[1]
+def draw_lines(img, lines, thickness=2):
+    left_mid_points = np.array([0,0])
+    left_slope = 0
+    left_count = 0
+    left_y = img.shape[1]
     
-    r_mid_points = np.array([0,0])
-    r_slope = 0
-    r_count = 0
-    ry = img.shape[1]
+    right_mid_points = np.array([0,0])
+    right_slope = 0
+    right_count = 0
+    right_y = img.shape[1]
     
     for line in lines:
         for x1,y1,x2,y2 in line:
@@ -47,74 +47,70 @@ def draw_lines(img, lines, color=[255, 0, 0], thickness=2):
             # Group all lines into left and right
             if slope > 0:
                 if round(slope) != 0:
-                    r_mid_points = np.add(r_mid_points, mid)
-                    r_slope = r_slope + slope
-                    r_count = r_count + 1
+                    right_mid_points = np.add(right_mid_points, mid)
+                    right_slope += slope
+                    right_count += 1
                 
-                    ry = min(ry,y1,y2, round(img.shape[1]/2))
+                    right_y = min(right_y, y1, y2, round(img.shape[1] / 2))
             elif round(slope) != 0:
-                l_mid_points = np.add(l_mid_points, mid)
-                l_slope = l_slope + slope
-                l_count = l_count + 1
+                left_mid_points = np.add(left_mid_points, mid)
+                left_slope += slope
+                left_count += 1
                 
-                ly = min(ly,y1,y2, round(img.shape[1]/2))
+                left_y = min(left_y, y1, y2, round(img.shape[1] / 2))
     
     # Calculate slope and position of lanes
-    if l_count == 0 or r_count == 0:
+    if left_count == 0 or right_count == 0:
         return
     
-    l_slope = l_slope / l_count
-    r_slope = r_slope / r_count
+    left_slope /= left_count
+    right_slope /= right_count
     
-    l_mid = np.true_divide(l_mid_points, l_count)
-    r_mid = np.true_divide(r_mid_points, r_count)
+    left_mid = np.true_divide(left_mid_points, left_count)
+    right_mid = np.true_divide(right_mid_points, right_count)
     
     # Find end points for the lanes
-    bottomY = img.shape[1]
+    bottom_Y = img.shape[1]
     
-    l_intercept = y_intercept(l_mid[0], l_mid[1], l_slope)
-    r_intercept = y_intercept(r_mid[0], r_mid[1], r_slope)
+    left_intercept = y_intercept(left_mid[0], left_mid[1], left_slope)
+    right_intercept = y_intercept(right_mid[0], right_mid[1], right_slope)
     
-    l_top = round(find_x(ly, l_slope, l_intercept))
-    l_bottom = round(find_x(bottomY, l_slope, l_intercept))
+    left_top = round(find_x(left_y, left_slope, left_intercept))
+    left_bottom = round(find_x(bottom_Y, left_slope, left_intercept))
     
-    r_top = round(find_x(ry, r_slope, r_intercept))
-    r_bottom = round(find_x(bottomY, r_slope, r_intercept))
+    right_top = round(find_x(right_y, right_slope, right_intercept))
+    right_bottom = round(find_x(bottom_Y, right_slope, right_intercept))
     
     # Draw final lane lines
-    cv.line(img, (l_bottom, bottomY), (l_top, ly), [0,255,0], thickness*10)
-    cv.line(img, (r_bottom, bottomY), (r_top, ry), [0,255,0], thickness*10)
+    cv.line(img, (left_bottom, bottom_Y), (left_top, left_y), [0,255,0], thickness * 10)
+    cv.line(img, (right_bottom, bottom_Y), (right_top, right_y), [0,255,0], thickness * 10)
     
     # Draw mid-point
-    cv.circle(img, (round(l_mid[0]), round(l_mid[1])), 10, [0,0,255], thickness*5)
-    cv.circle(img, (round(r_mid[0]), round(r_mid[1])), 10, [0,0,255], thickness*5)
+    cv.circle(img, (round(left_mid[0]), round(left_mid[1])), 10, [0,0,255], thickness * 5)
+    cv.circle(img, (round(right_mid[0]), round(right_mid[1])), 10, [0,0,255], thickness * 5)
     
-def hough_lines(img, rho, theta, threshold, min_line_len, max_line_gap):
-    lines = cv.HoughLinesP(img, rho, theta, threshold, np.array([]), minLineLength=min_line_len, maxLineGap=max_line_gap)
+def hough_lines(img, rho, theta, threshold, min_line_length, max_line_gap):
+    lines = cv.HoughLinesP(img, rho, theta, threshold, np.array([]), minLineLength=min_line_length, maxLineGap=max_line_gap)
     line_img = np.zeros((img.shape[0], img.shape[1], 3), dtype=np.uint8)
     draw_lines(line_img, lines)
     return line_img
 
-# Python 3 has support for cool math symbols.
-
-def weighted_img(img, initial_img, α=0.8, β=1., γ=0.):
-    return cv.addWeighted(initial_img, α, img, β, γ)
+def weighted_img(img, initial_img, alpha=0.8, beta=1., gamma=0.):
+    return cv.addWeighted(initial_img, alpha, img, beta, gamma)
 
 def region_of_interest(img, vertices):
-    #defining a blank mask to start with
     mask = np.zeros_like(img)   
     
     #defining a 3 channel or 1 channel color to fill the mask with depending on the input image
     if len(img.shape) > 2:
-        channel_count = img.shape[2]  # i.e. 3 or 4 depending on your image
+        channel_count = img.shape[2]
         ignore_mask_color = (255,) * channel_count
     else:
         ignore_mask_color = 255
         
-    #filling pixels inside the polygon defined by "vertices" with the fill color    
     cv.fillPoly(mask, vertices, ignore_mask_color)
     
-    #returning the image only where mask pixels are nonzero
+    #returning an image only where mask pixels are not zero
     masked_image = cv.bitwise_and(img, mask)
     return masked_image
 
@@ -134,7 +130,7 @@ def FindLanes(img):
     # Split channels
     blue,green,red = Split(img)
     
-    # Apply blur
+    # Apply Gaussian Blur
     blurred = GaussianBlur(red, 15)
     
     # Apply Canny Edge Detection to the processed image
@@ -149,15 +145,15 @@ def FindLanes(img):
     houghLines = hough_lines(regionEdges,2,np.pi/180,25,1,1.75)
 
     # Overlay lines on initial image
-    lanes = weighted_img(houghLines, BGR2RGB(img))
+    lanes = weighted_img(houghLines, bgr_2_rgb(img))
     return lanes
 
 # Find lanes in a video by converting to BGR color space first
 def FindLanesVid(frame):
-    return FindLanes(RGB2BGR(frame))
+    return FindLanes(rgb_2_bgr(frame))
 
 ########################################
-def improperUsage():
+def improper_usage():
     print("Usage: python3 laneDetection.py file_type(either image or video) file_path output_path")
     exit
 
@@ -171,9 +167,9 @@ if len(sys.argv) == 4:
     elif ftype == 'image':
         # Write Image
         img = cv.imread(sys.argv[2])
-        laneImg = RGB2BGR(FindLanes(img))
+        laneImg = rgb_2_bgr(FindLanes(img))
         cv.imwrite(sys.argv[3], laneImg)
     else:
-        improperUsage()
+        improper_usage()
 else:
-    improperUsage()
+    improper_usage()
